@@ -1,0 +1,46 @@
+import time
+import telebot
+import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+USER_ID = os.getenv("USER_ID")
+
+bot = telebot.TeleBot(BOT_TOKEN)
+
+def get_binance_price(symbol="USDT"):
+    try:
+        response = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT")
+        data = response.json()
+        return float(data["price"])
+    except Exception as e:
+        print(f"Ошибка получения цены Binance: {e}")
+        return None
+
+def check_deals():
+    binance_price = get_binance_price("BTC")
+    if not binance_price:
+        return
+
+    test_market_price = binance_price * 0.89
+
+    if test_market_price < binance_price * 0.9:
+        message = f"🚨 Найдена сделка ниже рынка!\n\n💰 Цена: {test_market_price:.2f} USDT\n📊 Рынок: {binance_price:.2f} USDT\n🔻 Отклонение: {100 - test_market_price / binance_price * 100:.2f}%"
+        bot.send_message(USER_ID, message)
+
+@bot.message_handler(commands=["start"])
+def send_welcome(message):
+    bot.send_message(message.chat.id, "Бот запущен и будет отслеживать p2p предложения.")
+
+def run_monitor():
+    while True:
+        check_deals()
+        time.sleep(600)
+
+if __name__ == "__main__":
+    import threading
+    threading.Thread(target=run_monitor).start()
+    bot.polling()
